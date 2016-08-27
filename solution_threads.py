@@ -17,7 +17,21 @@ def get_pw(page_name):
     return page_password
 
 
-def get_urls(page_name, urls_found, threads=[]):
+def get_new_urls(links, all_urls):
+    new_urls = []
+
+    for linked_page_name in links:
+        if linked_page_name not in all_urls:
+            print linked_page_name
+
+            new_urls.append(linked_page_name)
+
+    return new_urls
+
+
+def get_urls(page_name, prev_urls, lock):
+    all_urls = prev_urls
+
     password = get_pw(page_name)
     resp = comm_block.rpc_json(comm.LINK_SERVER,
                                dict(page=page_name, password=password))
@@ -27,26 +41,28 @@ def get_urls(page_name, urls_found, threads=[]):
 
     links = resp['ok']
 
-    for linked_page_name in links:
-        if linked_page_name not in urls_found:
-            print linked_page_name
+    with lock:
+        new_urls = get_new_urls(links, all_urls)
 
-            urls_found.add(linked_page_name)
+        all_urls.update(new_urls)
 
-            thread = threading.Thread(
-                target=get_urls,
-                args=(linked_page_name, urls_found, threads)
-            )
-            thread.start()
-
-            threads.append(thread)
-
-    return urls_found, threads
-
-if __name__ == "__main__":
-    urls_found, threads = get_urls(ROOT, set([ROOT]))
+    threads = []
+    for url in new_urls:
+        thread = threading.Thread(
+            target=get_urls,
+            args=(url, all_urls, lock)
+        )
+        thread.start()
+        threads.append(thread)
 
     for thread in threads:
         thread.join()
+
+    return all_urls
+
+if __name__ == "__main__":
+    lock = threading.Lock()
+
+    urls_found = get_urls(ROOT, set([ROOT]), lock)
 
     print "{} total urls found".format(len(urls_found))
