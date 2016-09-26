@@ -7,11 +7,8 @@ import ev
 from comm import PASSWORD_SERVER
 from comm_ev import send, recv
 
-event_loop = ev.EventLoop()
-
 
 def print_password(page_name, resp):
-    print "print page name: {}".format(page_name)
     data = b''.join(resp)
 
     resp = json.loads(data)
@@ -21,13 +18,16 @@ def print_password(page_name, resp):
     print "password for {}: {}".format(page_name, resp['ok'])
 
 
-def send_data(sock, req, page):
-    # closure to keep page name
-    send(event_loop, sock, req, lambda sock: receive_data(sock, page))
+def start(event_loop, page_name):
+    sock = comm_nonblock.connect(PASSWORD_SERVER)
+    req = json.dumps(dict(page=page_name))
+    send(event_loop, sock, req, lambda: receive_data())
 
+    def receive_data():
+        recv(event_loop, sock, lambda resp: handle_response(resp))
 
-def receive_data(sock, page_name):
-    recv(event_loop, sock, lambda resp: print_password(page_name, resp))
+        def handle_response(resp):
+            print_password(page_name, resp)
 
 
 def main():
@@ -37,18 +37,15 @@ def main():
         sys.stderr.write("Expecting one or more arguments, got None.")
         sys.exit(1)
 
+    event_loop = ev.EventLoop()
+
     page_names = [arg for arg in args]
 
-    for page in page_names:
-        sock = comm_nonblock.connect(PASSWORD_SERVER)
-        req = json.dumps(dict(page=page))
+    for page_name in page_names:
+        start(event_loop, page_name)
 
-        send_data(sock, req, page)
+    event_loop.run()
 
 
 if __name__ == '__main__':
     main()
-
-    print "EventLoop starting..."
-    event_loop.run()
-    print "EventLoop finished."
