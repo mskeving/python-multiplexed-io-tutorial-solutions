@@ -4,32 +4,29 @@ import comm_nonblock
 def recv(event_loop, sock, f):
     """Read from 'sock' until there's no more data to read.  When finished
        call f(data)."""
-    all_data = ""
+    data_list = []
 
-    def read(all_data):
-        data = comm_nonblock.recv(sock)
+    def read():
+        data_part = comm_nonblock.recv(sock)
 
-        if data is not None:
-            all_data += data
-            event_loop.on_read_ready(sock, lambda: read(all_data))
-
+        if data_part is None:
+            f(''.join(data_list))
         else:
-            f(all_data)
+            data_list.append(data_part)
+            event_loop.on_read_ready(sock, read)
 
-    event_loop.on_read_ready(sock, lambda: read(all_data))
+    read()
 
 
 def send(event_loop, sock, data, f):
     """Send data until there's no more data to send. When finished
        call f(data)."""
 
-    def send_data(all_data):
-        unsent_data = comm_nonblock.send(sock, all_data)
+    unsent_data = comm_nonblock.send(sock, data)
 
-        if unsent_data is not None:
-            event_loop.on_write_ready(sock, lambda: send_data(unsent_data))
-
-        else:
-            f(sock)
-
-    event_loop.on_write_ready(sock, lambda: send_data(data))
+    if unsent_data is None:
+        f()
+    else:
+        event_loop.on_write_ready(
+            sock, lambda: send(event_loop, sock, unsent_data, f)
+        )
