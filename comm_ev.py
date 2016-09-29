@@ -30,3 +30,10 @@ def send(event_loop, sock, data, f):
         event_loop.on_write_ready(
             sock, lambda: send(event_loop, sock, unsent_data, f)
         )
+
+
+def send_recv(event_loop, sock, req, f):
+    send(event_loop, sock, req, lambda: receive_data())
+
+    def receive_data():
+        recv(event_loop, sock, lambda resp: f(resp))
