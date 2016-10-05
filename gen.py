@@ -4,23 +4,37 @@ import select
 class EventLoop(object):
 
     def __init__(self):
-        self.socks_to_gens = {}
+        self.readables = {}
+        self.writeables = {}
 
     def next(self, gen):
         try:
-            sock = gen.next()
-            assert self.socks_to_gens.get(sock) is None, "sock already used"
-            self.socks_to_gens[sock] = gen
+            sock, signal = gen.next()
+            if signal == "send":
+                assert sock not in self.writeables, "sock already used"
+                self.writeables[sock] = gen
+            elif signal == "receive":
+                assert sock not in self.readables, "sock already used"
+                self.readables[sock] = gen
+            else:
+                raise Exception("Unknown signal {}".format(signal))
         except StopIteration:
             return
 
-    def run(self, *args):
-        for gen in args:
+    def run(self, gen_list):
+        for gen in gen_list:
             self.next(gen)
 
-        while self.socks_to_gens:
-            rlist, _, _ = select.select(self.socks_to_gens.keys(), (), ())
+        while self.readables or self.writeables:
+            rlist, wlist, xlist = select.select(
+                self.readables.keys(), self.writeables.keys(), ()
+            )
+            assert len(xlist) == 0, "Got exception on socket."
 
             for sock in rlist:
-                gen = self.socks_to_gens.pop(sock)
+                gen = self.readables.pop(sock)
+                self.next(gen)
+
+            for sock in wlist:
+                gen = self.writeables.pop(sock)
                 self.next(gen)
