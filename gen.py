@@ -1,5 +1,6 @@
 import select
 
+
 class EventLoop(object):
 
     def __init__(self):
@@ -38,9 +39,11 @@ class EventLoop(object):
         except StopIteration:
             pass
 
+
 class Read(object):
     def __init__(self, sock):
         self.sock = sock
+
 
 class Write(object):
     def __init__(self, sock):

@@ -4,6 +4,8 @@ import sys
 import comm
 import comm_nonblock
 import gen
+from list_gen_send_helper import send_data, receive_data
+
 
 def main():
     args = sys.argv[1:]
@@ -15,22 +17,18 @@ def main():
     event_loop = gen.EventLoop()
     event_loop.run(*[get_pw(page_name) for page_name in args])
 
+
 def get_pw(page_name):
     sock = comm_nonblock.connect(comm.PASSWORD_SERVER)
     req = json.dumps(dict(page=page_name))
-    while True:
-        yield gen.Write(sock)
-        req = comm_nonblock.send(sock, req)
-        if req is None:
-            break
+    for command in send_data(sock, req):
+        yield command
 
     data_list = []
-    while True:
-        yield gen.Read(sock)
-        data_part = comm_nonblock.recv(sock)
-        if data_part is None:
-            break
-        data_list.append(data_part)
+    for command, resp in receive_data(sock, req):
+        yield command
+        data_list = resp
+
     data = b''.join(data_list)
     resp = json.loads(data)
 
