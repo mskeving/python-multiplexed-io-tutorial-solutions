@@ -4,6 +4,8 @@ import gen
 import json
 import sys
 
+from list_gen_send_helper import send_data, receive_data
+
 
 def print_password(page_name, resp):
     data = b''.join(resp)
@@ -21,23 +23,12 @@ def dumper(page_name):
 
     data = json.dumps(dict(page=page_name))
 
-    # send all data
-    while True:
-        yield sock, "send"
-        data = comm_nonblock.send(sock, data)
+    for sock, signal in send_data(sock, data):
+        yield sock, signal
 
-        if data is None:
-            break
-
-    # receive all data
-    while True:
-        yield sock, "receive"
-        data = comm_nonblock.recv(sock)
-
-        if data is None:
-            break
-
-        password_resp.append(data)
+    for sock, signal, resp in receive_data(sock, data):
+        yield sock, signal
+        password_resp = resp
 
     print_password(page_name, password_resp)
 

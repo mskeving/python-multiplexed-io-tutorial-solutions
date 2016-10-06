@@ -7,7 +7,7 @@ class EventLoop(object):
         self.readables = {}
         self.writeables = {}
 
-    def next(self, gen):
+    def step(self, gen):
         try:
             sock, signal = gen.next()
             if signal == "send":
@@ -23,7 +23,7 @@ class EventLoop(object):
 
     def run(self, gen_list):
         for gen in gen_list:
-            self.next(gen)
+            self.step(gen)
 
         while self.readables or self.writeables:
             rlist, wlist, xlist = select.select(
@@ -33,8 +33,8 @@ class EventLoop(object):
 
             for sock in rlist:
                 gen = self.readables.pop(sock)
-                self.next(gen)
+                self.step(gen)
 
             for sock in wlist:
                 gen = self.writeables.pop(sock)
-                self.next(gen)
+                self.step(gen)
