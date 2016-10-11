@@ -1,4 +1,5 @@
 import select
+import types
 
 
 class EventLoop(object):
@@ -6,6 +7,7 @@ class EventLoop(object):
     def __init__(self):
         self.reads = {}
         self.writes = {}
+        self.subgen_to_gen = {}
 
     def run(self, *gens):
         for gen in gens:
@@ -28,16 +30,24 @@ class EventLoop(object):
     def step(self, gen):
         try:
             command = gen.next()
-            if isinstance(command, Read):
-                assert command.sock not in self.reads
-                self.reads[command.sock] = gen
-            elif isinstance(command, Write):
-                assert command.sock not in self.writes
-                self.writes[command.sock] = gen
-            else:
-                raise AssertionError("generator yielded unexpected value: {!r}".format(command))
         except StopIteration:
-            pass
+            parent_gen = self.subgen_to_gen.pop(gen, None)
+            if parent_gen:
+                self.step(parent_gen)
+            return
+
+        if isinstance(command, types.GeneratorType):
+            sub_gen = command
+            self.step(sub_gen)
+            self.subgen_to_gen[sub_gen] = gen
+        elif isinstance(command, Read):
+            assert command.sock not in self.reads
+            self.reads[command.sock] = gen
+        elif isinstance(command, Write):
+            assert command.sock not in self.writes
+            self.writes[command.sock] = gen
+        else:
+            raise AssertionError("generator yielded unexpected value: {!r}".format(command))
 
 
 class Read(object):
