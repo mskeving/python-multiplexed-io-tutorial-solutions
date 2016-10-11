@@ -10,13 +10,15 @@ def send(sock, data):
             break
 
 
-def recv(sock, result_holder):
+def recv(sock):
     data_list = []
     while True:
         yield gen.Read(sock)
         data_part = comm_nonblock.recv(sock)
+
         if data_part is None:
+            data = b''.join(data_list)
+            yield data
             break
+
         data_list.append(data_part)
-    data = b''.join(data_list)
-    result_holder.append(data)

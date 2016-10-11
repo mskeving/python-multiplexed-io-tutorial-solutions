@@ -46,6 +46,12 @@ class EventLoop(object):
         elif isinstance(command, Write):
             assert command.sock not in self.writes
             self.writes[command.sock] = gen
+        elif isinstance(command, str):
+            parent_gen = self.subgen_to_gen.pop(gen, None)
+            try:
+                parent_gen.send(command)
+            except StopIteration:
+                return
         else:
             raise AssertionError("generator yielded unexpected value: {!r}".format(command))
 
