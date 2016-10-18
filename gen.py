@@ -27,13 +27,13 @@ class EventLoop(object):
                 gen = self.writes.pop(sock)
                 self.step(gen)
 
-    def step(self, gen):
+    def step(self, gen, command=None):
         try:
-            command = gen.next()
+            command = gen.send(command)
         except StopIteration:
             parent_gen = self.subgen_to_gen.pop(gen, None)
             if parent_gen:
-                self.step(parent_gen)
+                self.step(parent_gen, command)
             return
 
         if isinstance(command, types.GeneratorType):
@@ -46,14 +46,8 @@ class EventLoop(object):
         elif isinstance(command, Write):
             assert command.sock not in self.writes
             self.writes[command.sock] = gen
-        elif isinstance(command, str):
-            parent_gen = self.subgen_to_gen.pop(gen, None)
-            try:
-                parent_gen.send(command)
-            except StopIteration:
-                return
         else:
-            raise AssertionError("generator yielded unexpected value: {!r}".format(command))
+            self.step(gen, command)
 
 
 class Read(object):
